@@ -39,6 +39,7 @@ class CVUpload(Base):
     skills: Mapped[Optional[str]] = mapped_column(Text)            # JSON array
     strengths: Mapped[Optional[str]] = mapped_column(Text)         # JSON array
     recommendations: Mapped[Optional[str]] = mapped_column(Text)   # JSON array
+    best_fit_role: Mapped[Optional[str]] = mapped_column(String(255))  # e.g., "Senior Frontend Engineer"
     raw_text: Mapped[Optional[str]] = mapped_column(Text)          # extracted CV text
 
     status: Mapped[str] = mapped_column(String(50), default="pending")  # pending | analyzed | failed

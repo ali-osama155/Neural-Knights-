@@ -1,0 +1,35 @@
+You are an expert full-stack developer. We are building a web-based interview platform.
+
+
+Task:
+1. Implement CV upload functionality in the frontend (drag & drop + file input).
+2. On upload:
+   - Send the CV (PDF/DOCX supported) to the backend.
+   - Backend should:
+     - Parse the CV.
+     - Extract skills (list).
+     - Calculate overall score (0-100).
+     - Determine best-fit role (either user-selected or AI-recommended).
+     - Prepare structured output (JSON) for the next stage: realtime interview questions model.
+3. Display results nicely: skills list (with chips/tags), score (with progress bar or gauge), best-fit role, and a "Proceed to Interview" button.
+4. Make the output data available globally (Context / Zustand / Redux / props) so it can be passed to the questions/interview stage.
+5. Include proper error handling, loading states, and file size/type validation.
+
+At the end, create a summary file `analysis-model-implementation.txt` inside the `analysis model`  that lists:
+- All files created/modified
+- Key decisions made
+- How to test the flow
+- Any missing pieces or TODOs
+
+
+Start by exploring the current codebase if needed, then implement step by step.
+
+
+
+
+
+
+
+
+
+now I got error "CV analysis failed on backend" can you solve it also make sure that the analysis is working by lgbm_model.pkl in analysis model folder to get skills, cv score and best matching rule(through the model or api call or user input) 

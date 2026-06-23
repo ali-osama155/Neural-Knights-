@@ -11,3 +11,10 @@ python-multipart==0.0.12   # file uploads
 httpx==0.27.2              # async HTTP (AI API calls)
 openai==1.51.0             # or anthropic SDK
 python-dotenv==1.0.1
+pdfminer.six==20221105     # PDF text extraction
+python-docx==1.1.0         # DOCX text extraction
+lightgbm>=4.0.0            # local CV scoring model
+scikit-learn>=1.3.0        # TF-IDF vectorizer
+nltk>=3.8.0                # NLP processing
+numpy>=1.24.0              # numerical operations
+scipy>=1.10.0              # sparse matrices for model features

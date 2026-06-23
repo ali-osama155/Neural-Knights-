@@ -51,6 +51,7 @@ class CVUploadOut(BaseModel):
     skills: Optional[list[str]]
     strengths: Optional[list[str]]
     recommendations: Optional[list[str]]
+    best_fit_role: Optional[str]
     status: str
     uploaded_at: datetime
     analyzed_at: Optional[datetime]

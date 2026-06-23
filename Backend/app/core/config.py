@@ -1,33 +1,39 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import lru_cache
-
+from pydantic_settings import BaseSettings
+from typing import List
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-
-    # App
-    APP_NAME: str = "RecruitAI"
-    DEBUG: bool = False
-    SECRET_KEY: str = "change-me"
-
+    APP_NAME: str = "Neural Knights"
+    
+    # Security
+    SECRET_KEY: str = "change-me-to-a-long-random-string"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./recruitai.db"
-
-    # JWT
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    ALGORITHM: str = "HS256"
-
-    # AI
-    OPENAI_API_KEY: str = ""
-
-    # Storage
+    DEBUG: bool = True                    # ← Added this
+    
+    # File Upload
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 50
-
+    
+    # OpenAI
+    OPENAI_API_KEY: str = ""
+    
     # CORS
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+        extra = "ignore"
 
 
-@lru_cache
 def get_settings() -> Settings:
     return Settings()

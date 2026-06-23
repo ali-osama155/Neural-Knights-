@@ -1,3 +1,4 @@
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import get_settings
@@ -39,3 +40,27 @@ async def create_tables() -> None:
     async with engine.begin() as conn:
         from app.models import models  # noqa: F401 — import to register models
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def sync_schema() -> None:
+    """Add columns that create_all does not apply to existing SQLite tables."""
+    async with engine.begin() as conn:
+        def _missing_columns(connection):
+            inspector = inspect(connection)
+            if "cv_uploads" not in inspector.get_table_names():
+                return []
+            existing = {col["name"] for col in inspector.get_columns("cv_uploads")}
+            expected = {
+                "best_fit_role": "VARCHAR(255)",
+            }
+            return [
+                (name, col_type)
+                for name, col_type in expected.items()
+                if name not in existing
+            ]
+
+        missing = await conn.run_sync(_missing_columns)
+        for column_name, column_type in missing:
+            await conn.execute(
+                text(f"ALTER TABLE cv_uploads ADD COLUMN {column_name} {column_type}")
+            )

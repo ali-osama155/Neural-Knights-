@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { CVProvider } from './contexts/CVContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import CVUpload from './pages/CVUpload'
@@ -25,15 +26,17 @@ function AppLayout({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
-        <Route path="/cv-upload" element={<AppLayout><CVUpload /></AppLayout>} />
-        <Route path="/chatbot" element={<AppLayout><Chatbot /></AppLayout>} />
-        <Route path="/interview" element={<AppLayout><Interview /></AppLayout>} />
-        <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <CVProvider>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
+          <Route path="/cv-upload" element={<AppLayout><CVUpload /></AppLayout>} />
+          <Route path="/chatbot" element={<AppLayout><Chatbot /></AppLayout>} />
+          <Route path="/interview" element={<AppLayout><Interview /></AppLayout>} />
+          <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </CVProvider>
     </BrowserRouter>
   )
 }

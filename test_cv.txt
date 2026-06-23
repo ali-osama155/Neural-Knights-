@@ -1,0 +1,33 @@
+John Doe
+john.doe@email.com
+(555) 123-4567
+
+PROFESSIONAL SUMMARY
+Experienced software engineer with 5+ years in full-stack development. Skilled in Python, JavaScript, React, and FastAPI. Passionate about building scalable AI-powered applications.
+
+SKILLS
+- Python, JavaScript, TypeScript, SQL
+- FastAPI, React, Node.js, Django
+- Machine Learning, NLP, OpenAI API
+- PostgreSQL, SQLite, MongoDB
+- Docker, AWS, CI/CD
+- REST APIs, WebSocket
+
+EXPERIENCE
+Senior Software Engineer | TechCorp | 2021-Present
+- Built AI-powered recruitment platform using FastAPI and React
+- Implemented CV parsing and analysis pipeline with OpenAI integration
+- Led team of 3 engineers, improved system performance by 40%
+
+Full Stack Developer | StartupXYZ | 2019-2021
+- Developed e-commerce platform with 100k+ users
+- Implemented real-time chat using WebSocket
+- Migrated legacy monolith to microservices
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of Technology, 2019
+
+CERTIFICATIONS
+- AWS Certified Solutions Architect
+- Google Cloud Professional Data Engineer
