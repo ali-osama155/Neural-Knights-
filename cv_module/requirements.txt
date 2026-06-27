@@ -1,0 +1,5 @@
+Identify all aspects discussed in each review (multi-label). One review may mention food, service, and price together.
+
+evaluate each text as positive , negative , neutral
+
+generate JSON 
