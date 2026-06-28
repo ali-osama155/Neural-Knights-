@@ -2,6 +2,23 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
+# ── CV Emotion Analysis ──────────────────────────────────────────
+
+class FrameAnalysisOut(BaseModel):
+    face_detected: bool
+    top_emotion: str
+    top_confidence: float
+    eye_contact: bool
+    gaze_direction: str
+
+
+class CVEndOut(BaseModel):
+    overall_cv_score: Optional[float]
+    eye_contact: Optional[float]
+    dominant_emotion: Optional[str]
+    behavioral_flags: list[str] = []
+    feedback_summary: Optional[str]
+
 
 # ── Auth ─────────────────────────────────────────────────────────
 

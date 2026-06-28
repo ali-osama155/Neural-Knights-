@@ -2,14 +2,60 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Zap, Eye, EyeOff } from 'lucide-react'
 
+const BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true)
   const [showPass, setShowPass] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    navigate('/dashboard')
+    setError('')
+    setLoading(true)
+
+    try {
+      if (!isLogin) {
+        // Register first
+        const res = await fetch(`${BACKEND}/api/v1/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, full_name: fullName }),
+        })
+        if (!res.ok) {
+          const data = await res.json()
+          setError(data.detail || 'Registration failed')
+          setLoading(false)
+          return
+        }
+      }
+
+      // Login
+      const res = await fetch(`${BACKEND}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.detail || 'Login failed')
+        setLoading(false)
+        return
+      }
+
+      localStorage.setItem('access_token', data.access_token)
+      navigate('/dashboard')
+    } catch (err) {
+      setError('Network error — is the server running?')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -44,6 +90,8 @@ export default function Login() {
                 type="text"
                 placeholder="Mariam Samir"
                 required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
               />
             </div>
           )}
@@ -55,6 +103,8 @@ export default function Login() {
               type="email"
               placeholder="mariam@example.com"
               required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
@@ -67,6 +117,8 @@ export default function Login() {
                 placeholder="••••••••"
                 required
                 style={{ paddingRight: 44 }}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
               <button
                 type="button"
@@ -82,8 +134,19 @@ export default function Login() {
             <p style={styles.forgot}>Forgot password?</p>
           )}
 
-          <button className="btn-primary" type="submit" style={{ width: '100%', marginTop: 8 }}>
-            {isLogin ? 'Sign In' : 'Create Account'}
+          {error && (
+            <p style={styles.errorMsg}>{error}</p>
+          )}
+
+          <button
+            className="btn-primary"
+            type="submit"
+            style={{ width: '100%', marginTop: 8, opacity: loading ? 0.7 : 1 }}
+            disabled={loading}
+          >
+            {loading
+              ? 'Please wait…'
+              : isLogin ? 'Sign In' : 'Create Account'}
           </button>
         </form>
 
@@ -96,15 +159,15 @@ export default function Login() {
 
         {/* Social buttons */}
         <div style={styles.socialRow}>
-          <button style={styles.socialBtn}> Google</button>
-          <button style={styles.socialBtn}> LinkedIn</button>
+          <button style={styles.socialBtn}>Google</button>
+          <button style={styles.socialBtn}>LinkedIn</button>
         </div>
 
         {/* Toggle */}
         <p style={styles.toggle}>
           {isLogin ? "Don't have an account? " : 'Already have an account? '}
           <span
-            onClick={() => setIsLogin(!isLogin)}
+            onClick={() => { setIsLogin(!isLogin); setError('') }}
             style={styles.toggleLink}
           >
             {isLogin ? 'Sign up' : 'Sign in'}
@@ -220,6 +283,15 @@ const styles = {
     textAlign: 'right',
     cursor: 'pointer',
     fontWeight: 500,
+  },
+  errorMsg: {
+    fontSize: 13,
+    color: '#ef4444',
+    textAlign: 'center',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: 8,
+    padding: '8px 12px',
   },
   divider: {
     display: 'flex',

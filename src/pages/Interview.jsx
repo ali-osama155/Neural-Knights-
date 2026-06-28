@@ -11,6 +11,21 @@ const questions = [
   "Where do you see yourself in the next 3–5 years?",
 ]
 
+const BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const FRAME_INTERVAL = 350
+
+function authFetch(path, opts = {}) {
+  const token = localStorage.getItem('access_token')
+  return fetch(`${BACKEND}${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    },
+  })
+}
+
 export default function Interview() {
   // Session state
   const [phase, setPhase] = useState('idle') // idle | countdown | recording | finished
@@ -27,6 +42,12 @@ export default function Interview() {
   const chunksRef = useRef([])
   const timerRef = useRef(null)
   const countdownRef = useRef(null)
+  // CV analysis additions
+  const canvasRef = useRef(null)
+  const frameIntervalRef = useRef(null)
+  const sessionIdRef = useRef(null)
+  const [faceDetected, setFaceDetected] = useState(false)
+  const [cvResults, setCvResults] = useState(null)
 
   // Start camera preview on mount
   useEffect(() => {
@@ -71,6 +92,7 @@ export default function Interview() {
     streamRef.current?.getTracks().forEach((t) => t.stop())
     clearInterval(timerRef.current)
     clearInterval(countdownRef.current)
+    clearInterval(frameIntervalRef.current)
   }
 
   function beginCountdown() {
@@ -87,7 +109,7 @@ export default function Interview() {
     }, 1000)
   }
 
-  function startRecording() {
+  async function startRecording() {
     chunksRef.current = []
     if (streamRef.current) {
       const mr = new MediaRecorder(streamRef.current)
@@ -100,14 +122,60 @@ export default function Interview() {
     setSeconds(0)
     setPhase('recording')
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
+
+    // CV: create interview session then start recording
+    try {
+      const res = await authFetch('/api/v1/interviews/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ job_title: 'General' }),
+      })
+      if (res.ok) {
+        const sess = await res.json()
+        sessionIdRef.current = sess.id
+        await authFetch(`/api/v1/interviews/sessions/${sess.id}/cv-start`, {
+          method: 'POST',
+          body: JSON.stringify({ question_text: questions[0] }),
+        })
+        startFrameCapture(sess.id)
+      }
+    } catch (e) { console.warn('[CV] session start failed:', e) }
   }
 
-  function stopSession(autoStopped = false) {
+  function startFrameCapture(sid) {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    frameIntervalRef.current = setInterval(() => {
+      if (!videoRef.current) return
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
+      const frame = canvas.toDataURL('image/jpeg', 0.85)
+      authFetch(`/api/v1/interviews/sessions/${sid}/analyze-frame`, {
+        method: 'POST',
+        body: JSON.stringify({ frame }),
+      }).then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setFaceDetected(!!d.face_detected) })
+        .catch(() => {})
+    }, FRAME_INTERVAL)
+  }
+
+  async function stopSession(autoStopped = false) {
     clearInterval(timerRef.current)
+    clearInterval(frameIntervalRef.current)
     if (mediaRecorderRef.current?.state !== 'inactive') {
       mediaRecorderRef.current?.stop()
     }
     setPhase('finished')
+
+    // CV: finalise analysis
+    if (sessionIdRef.current) {
+      try {
+        const r = await authFetch(
+          `/api/v1/interviews/sessions/${sessionIdRef.current}/cv-end`,
+          { method: 'POST' }
+        )
+        if (r.ok) setCvResults(await r.json())
+      } catch (e) { console.warn('[CV] cv-end failed:', e) }
+    }
 
     // Build downloadable blob
     setTimeout(() => {
@@ -134,6 +202,9 @@ export default function Interview() {
     setPhase('idle')
     setSeconds(0)
     setCurrentQ(0)
+    setCvResults(null)
+    setFaceDetected(false)
+    sessionIdRef.current = null
     startCamera()
   }
 
@@ -161,8 +232,40 @@ export default function Interview() {
           <div style={styles.resultRow}>
             <ResultChip label="Questions" value={questions.length} />
             <ResultChip label="Duration" value={formatTime(seconds)} />
-            <ResultChip label="AI Score" value="—" />
+            <ResultChip label="CV Score"
+              value={cvResults?.overall_cv_score != null
+                ? `${Math.round(cvResults.overall_cv_score)}%` : "—"} />
           </div>
+
+          {/* CV behavioral results */}
+          {cvResults && (
+            <div style={{ marginTop: 20, padding: "16px 20px",
+              background: "#f8fafc", borderRadius: 12, textAlign: "left",
+              border: "1px solid #e2e8f0" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 10,
+                color: "#0f172a" }}>Behavioral Analysis</p>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <MiniStat label="Eye Contact"
+                  value={cvResults.eye_contact != null
+                    ? `${Math.round(cvResults.eye_contact)}%` : "—"} />
+                <MiniStat label="Emotion"
+                  value={cvResults.dominant_emotion
+                    ? cvResults.dominant_emotion.charAt(0).toUpperCase() +
+                      cvResults.dominant_emotion.slice(1) : "—"} />
+              </div>
+              {cvResults.feedback_summary && (
+                <p style={{ fontSize: 13, color: "#64748b", marginTop: 12,
+                  lineHeight: 1.6 }}>{cvResults.feedback_summary}</p>
+              )}
+              {cvResults.behavioral_flags?.length > 0 && (
+                <ul style={{ paddingLeft: 18, marginTop: 8,
+                  fontSize: 12, color: "#64748b", lineHeight: 1.8 }}>
+                  {cvResults.behavioral_flags.map((f, i) =>
+                    <li key={i}>{f}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 28, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
@@ -179,7 +282,7 @@ export default function Interview() {
 
           <div style={styles.submitNote}>
             <CheckCircle size={14} color="#16a34a" />
-            <span>Recording saved — submit to backend for AI analysis</span>
+            <span>Recording and behavioral analysis saved to your profile</span>
           </div>
         </div>
       </div>
@@ -246,6 +349,22 @@ export default function Interview() {
                 </span>
               </div>
             )}
+
+            {/* Face detection ring */}
+            {phase === 'recording' && (
+              <div style={{
+                position: 'absolute', top: '50%', left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 190, height: 190, borderRadius: '50%',
+                border: `2px solid ${faceDetected ? 'rgba(34,197,94,0.85)' : 'rgba(255,255,255,0.18)'}`,
+                boxShadow: faceDetected ? '0 0 24px rgba(34,197,94,0.3)' : 'none',
+                transition: 'border-color .3s, box-shadow .3s',
+                pointerEvents: 'none', zIndex: 4,
+              }} />
+            )}
+
+            {/* Hidden canvas for frame capture */}
+            <canvas ref={canvasRef} width={640} height={480} style={{ display: 'none' }} />
 
             {/* Video element */}
             <video
@@ -412,6 +531,16 @@ function ResultChip({ label, value }) {
     }}>
       <p style={{ fontSize: 20, fontWeight: 700, color: '#2980c4' }}>{value}</p>
       <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{label}</p>
+    </div>
+  )
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div style={{ background: 'white', borderRadius: 10, padding: '10px 16px',
+      textAlign: 'center', minWidth: 100, border: '1px solid #e2e8f0' }}>
+      <p style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>{value}</p>
+      <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{label}</p>
     </div>
   )
 }

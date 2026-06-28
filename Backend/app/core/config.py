@@ -3,22 +3,23 @@ from typing import List
 
 class Settings(BaseSettings):
     APP_NAME: str = "Neural Knights"
-    
+
     # Security
     SECRET_KEY: str = "change-me-to-a-long-random-string"
+    ALGORITHM: str = "HS256"          # <-- ADD THIS
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    
+
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./recruitai.db"
-    DEBUG: bool = True                    # ← Added this
-    
+    DEBUG: bool = True
+
     # File Upload
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 50
-    
+
     # OpenAI
     OPENAI_API_KEY: str = ""
-    
+
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:5173",

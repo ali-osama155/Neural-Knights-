@@ -6,6 +6,11 @@ from app.core.config import get_settings
 from app.core.database import create_tables, sync_schema
 from app.api.v1.router import api_router
 
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
 settings = get_settings()
 
 @asynccontextmanager
