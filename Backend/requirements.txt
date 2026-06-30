@@ -18,3 +18,6 @@ scikit-learn>=1.3.0        # TF-IDF vectorizer
 nltk>=3.8.0                # NLP processing
 numpy>=1.24.0              # numerical operations
 scipy>=1.10.0              # sparse matrices for model features
+google-generativeai
+gtts
+openai-whisper

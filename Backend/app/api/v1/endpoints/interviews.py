@@ -28,15 +28,20 @@ from app.schemas.schemas import (
 from app.services.storage_service import save_video
 from app.services.ai_service import analyze_interview
 
+from app.services.question_service import generate_interview_questions
+from app.services.tts_service import text_to_speech
+from app.services.stt_service import speech_to_text
+from fastapi.responses import FileResponse
+
 router = APIRouter(prefix="/interviews", tags=["Interviews"])
 
-# Default questions — could also come from the request body
+# Questions are now generated dynamically from the candidate's role and skills
 DEFAULT_QUESTIONS = [
     "Tell me about yourself and your background in software development.",
     "Describe a challenging project you worked on and how you overcame obstacles.",
     "What is your experience with React.js and modern frontend development?",
     "How do you approach debugging a complex bug in production?",
-    "Where do you see yourself in the next 3–5 years?",
+    "Where do you see yourself in the next 3-5 years?",
 ]
 
 
@@ -44,7 +49,7 @@ async def _analyze_session(db: AsyncSession, session: InterviewSession) -> None:
     """Background task: run AI analysis on the uploaded video."""
     # In production: call OpenAI Whisper to transcribe the video first.
     # For now, we use a placeholder transcript.
-    transcript = f"[Transcript of session {session.id} — integrate Whisper here]"
+    transcript = speech_to_text(session.video_path) if session.video_path else ""
 
     result = await analyze_interview(transcript, DEFAULT_QUESTIONS)
 
@@ -183,3 +188,46 @@ async def delete_session(
         raise HTTPException(status_code=404, detail="Session not found")
     await db.delete(session)
     return {"message": "Session deleted"}
+
+# ── Reem's Endpoints ─────────────────────────────────────────────
+
+@router.post("/generate-questions")
+async def get_questions(
+    job_title: str,
+    skills: str,
+    #current_user: User = Depends(get_current_user),
+):
+    """
+    Generate interview questions based on role and skills from Ali's CV analysis.
+    skills: comma-separated string e.g. "python, tensorflow, deep learning"
+    """
+    skills_list = [s.strip() for s in skills.split(",")]
+    questions = generate_interview_questions(job_title, skills_list)
+    return {"questions": questions}
+
+
+@router.post("/text-to-speech")
+async def tts_endpoint(
+    text: str,
+    #current_user: User = Depends(get_current_user),
+):
+    """Convert a question to speech audio file."""
+    audio_path = text_to_speech(text)
+    return FileResponse(audio_path, media_type="audio/mpeg")
+
+
+@router.post("/speech-to-text")
+async def stt_endpoint(
+    file: UploadFile = File(...),
+    #current_user: User = Depends(get_current_user),
+):
+    """
+    Convert interviewee's audio answer to text.
+    Returns transcribed text for Sarah's evaluation.
+    """
+    audio_path = f"uploads/answer_{file.filename}"
+    with open(audio_path, "wb") as f:
+        f.write(await file.read())
+    
+    text = speech_to_text(audio_path)
+    return {"text": text}

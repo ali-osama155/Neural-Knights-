@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Upload, FileText, CheckCircle, X, AlertCircle, Loader } from 'lucide-react'
 import { useCV } from '../contexts/CVContext'
 
@@ -7,6 +8,7 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt']
 
 export default function CVUpload() {
   const { uploadCV, pollAnalysisResults, clearCV, getAnalysisData, loading, error, isPolling, cvData } = useCV()
+  const navigate = useNavigate()
   const [file, setFile] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [analyzed, setAnalyzed] = useState(false)
@@ -307,8 +309,7 @@ export default function CVUpload() {
               <button 
                 style={styles.proceedBtn}
                 onClick={() => {
-                  // Navigate to interview or next stage
-                  window.location.href = '/interview'
+                  navigate('/interview')
                 }}
               >
                 ✅ Proceed to Interview

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str = ""
 
+    # Gemini
+    GEMINI_API_KEY: str = ""
+
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:5173",
@@ -38,3 +41,5 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     return Settings()
+
+settings = Settings()

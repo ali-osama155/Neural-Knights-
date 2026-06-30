@@ -1,25 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
+import { useCV } from '../contexts/CVContext'
 import { Circle, Video, VideoOff, Mic, MicOff, ChevronRight, Clock, CheckCircle } from 'lucide-react'
 
 const MAX_SECONDS = 10 * 60 // 10 minutes
 
-const questions = [
-  "Tell me about yourself and your background in software development.",
-  "Describe a challenging project you worked on and how you overcame obstacles.",
-  "What is your experience with React.js and modern frontend development?",
-  "How do you approach debugging a complex bug in production?",
-  "Where do you see yourself in the next 3–5 years?",
-]
 
 const BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const FRAME_INTERVAL = 350
 
 function authFetch(path, opts = {}) {
   const token = localStorage.getItem('access_token')
+  const isFormData = opts.body instanceof FormData
   return fetch(`${BACKEND}${path}`, {
     ...opts,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(opts.headers || {}),
     },
@@ -35,6 +30,13 @@ export default function Interview() {
   const [camOn, setCamOn] = useState(true)
   const [micOn, setMicOn] = useState(true)
 
+  //generating questions
+  const [questions, setQuestions] = useState([])
+  const [questionsLoading, setQuestionsLoading] = useState(true)
+  const [answers, setAnswers] = useState({}) // { [questionIndex]: { transcript, status } }
+  const [transcribing, setTranscribing] = useState(false)
+  const { getAnalysisData, cvData } = useCV()
+
   // Media
   const videoRef = useRef(null)
   const streamRef = useRef(null)
@@ -42,6 +44,7 @@ export default function Interview() {
   const chunksRef = useRef([])
   const timerRef = useRef(null)
   const countdownRef = useRef(null)
+  const questionsFetchedRef = useRef(false)
   // CV analysis additions
   const canvasRef = useRef(null)
   const frameIntervalRef = useRef(null)
@@ -54,6 +57,36 @@ export default function Interview() {
     startCamera()
     return () => stopCamera()
   }, [])
+
+  useEffect(() => {
+  async function fetchQuestions() {
+    if (questionsFetchedRef.current) return
+    questionsFetchedRef.current = true
+    setQuestionsLoading(true)
+    console.log('cvData at interview mount:', cvData)
+    const analysis = getAnalysisData()
+    const role = analysis?.bestFitRole || 'Software Developer'
+    const skills = analysis?.skills?.length ? analysis.skills.join(', ') : 'general programming'
+
+    try {
+      const params = new URLSearchParams({ job_title: role, skills })
+      const res = await authFetch(`/api/v1/interviews/generate-questions?${params.toString()}`, {
+        method: 'POST',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setQuestions(data.questions || [])
+      } else {
+        console.warn('Failed to fetch questions, status:', res.status)
+      }
+    } catch (e) {
+      console.warn('[Questions] fetch failed:', e)
+    } finally {
+      setQuestionsLoading(false)
+    }
+  }
+  fetchQuestions()
+}, [])
 
   // Sync video track with camOn toggle
   useEffect(() => {
@@ -110,36 +143,114 @@ export default function Interview() {
   }
 
   async function startRecording() {
-    chunksRef.current = []
-    if (streamRef.current) {
-      const mr = new MediaRecorder(streamRef.current)
-      mr.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
-      mr.start(1000) // collect every second
-      mediaRecorderRef.current = mr
-    }
-    setSeconds(0)
-    setPhase('recording')
-    timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
+  setSeconds(0)
+  setPhase('recording')
+  timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
 
-    // CV: create interview session then start recording
-    try {
-      const res = await authFetch('/api/v1/interviews/sessions', {
+  // CV: create interview session then start frame capture
+  try {
+    const res = await authFetch('/api/v1/interviews/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ job_title: getAnalysisData()?.bestFitRole || 'General' }),
+    })
+    if (res.ok) {
+      const sess = await res.json()
+      sessionIdRef.current = sess.id
+      await authFetch(`/api/v1/interviews/sessions/${sess.id}/cv-start`, {
         method: 'POST',
-        body: JSON.stringify({ job_title: 'General' }),
+        body: JSON.stringify({ question_text: questions[0] }),
       })
-      if (res.ok) {
-        const sess = await res.json()
-        sessionIdRef.current = sess.id
-        await authFetch(`/api/v1/interviews/sessions/${sess.id}/cv-start`, {
-          method: 'POST',
-          body: JSON.stringify({ question_text: questions[0] }),
-        })
-        startFrameCapture(sess.id)
-      }
-    } catch (e) { console.warn('[CV] session start failed:', e) }
+      startFrameCapture(sess.id)
+    }
+  } catch (e) { console.warn('[CV] session start failed:', e) }
+
+  // Start recording the first question's audio
+  startQuestionRecording()
+}
+
+function startQuestionRecording() {
+  chunksRef.current = []
+  if (streamRef.current) {
+    const mr = new MediaRecorder(streamRef.current)
+    mr.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data)
+    }
+    mr.start(1000)
+    mediaRecorderRef.current = mr
   }
+}
+
+  function stopQuestionRecording() {
+  return new Promise((resolve) => {
+    const mr = mediaRecorderRef.current
+    if (!mr || mr.state === 'inactive') {
+      resolve(null)
+      return
+    }
+    mr.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+      resolve(blob)
+    }
+    mr.stop()
+  })
+}
+
+  async function transcribeAnswer(qIndex, blob) {
+  if (!blob || blob.size === 0) return
+  setTranscribing(true)
+  setAnswers((prev) => ({
+    ...prev,
+    [qIndex]: { transcript: '', status: 'transcribing' },
+  }))
+  
+  try {
+    const formData = new FormData()
+    formData.append('file', blob, `answer_q${qIndex}.webm`)
+
+    const res = await authFetch('/api/v1/interviews/speech-to-text', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      setAnswers((prev) => ({
+        ...prev,
+        [qIndex]: { transcript: data.text || '', status: 'done' },
+      }))
+      return { transcript: data.text || '', status: 'done' }
+    } else {
+      console.warn('[STT] failed, status:', res.status)
+      setAnswers((prev) => ({
+        ...prev,
+        [qIndex]: { transcript: '', status: 'error' },
+      }))
+      return { transcript: '', status: 'error' }
+    }
+  } catch (e) {
+    console.warn('[STT] fetch failed:', e)
+    setAnswers((prev) => ({
+      ...prev,
+      [qIndex]: { transcript: '', status: 'error' },
+    }))
+    return { transcript: '', status: 'error' }
+  } finally {
+    setTranscribing(false)
+  }
+}
+
+
+  async function goToNextQuestion() {
+  const qIndex = currentQ
+  const blob = await stopQuestionRecording()
+  transcribeAnswer(qIndex, blob) // fire and forget — don't block UI
+
+  if (currentQ < questions.length - 1) {
+    setCurrentQ((q) => q + 1)
+    startQuestionRecording()
+  }
+}
+
 
   function startFrameCapture(sid) {
     const canvas = canvasRef.current
@@ -161,11 +272,25 @@ export default function Interview() {
   async function stopSession(autoStopped = false) {
     clearInterval(timerRef.current)
     clearInterval(frameIntervalRef.current)
-    if (mediaRecorderRef.current?.state !== 'inactive') {
-      mediaRecorderRef.current?.stop()
-    }
-    setPhase('finished')
 
+    const lastBlob = await stopQuestionRecording()
+    const lastResult = await transcribeAnswer(currentQ, lastBlob)
+
+    setPhase('finished')
+    console.log('Final answers:', questions.map((q, i) => {
+      if (i === currentQ) {
+        return {
+          question: q,
+          transcript: lastResult?.transcript || '(none)',
+          status: lastResult?.status || 'missing',
+        }
+      }
+      return {
+        question: q,
+        transcript: answers[i]?.transcript || '(none yet)',
+        status: answers[i]?.status || 'missing',
+      }
+    }))
     // CV: finalise analysis
     if (sessionIdRef.current) {
       try {
@@ -417,16 +542,38 @@ export default function Interview() {
 
           {/* Main action button */}
           {phase === 'idle' && (
-            <button onClick={beginCountdown} style={styles.startBtn}>
+            <button
+              onClick={beginCountdown}
+              style={styles.startBtn}
+              disabled={questionsLoading || questions.length === 0}
+            >
               <Circle size={18} color="white" />
-              Start 10-Min Interview
-            </button>
+              {questionsLoading ? 'Loading Questions…' : 'Start 10-Min Interview'}
+              </button>
           )}
+
           {phase === 'recording' && (
             <button onClick={() => stopSession(false)} style={styles.stopBtn}>
               <Circle size={18} color="white" fill="white" />
               End & Save Session
             </button>
+          )}
+
+          {/* Active question highlight — moved here so it's visible without scrolling */}
+          {phase === 'recording' && (
+            <div className="card" style={styles.activeQCard}>
+              <span style={styles.qBadge}>Now Answering — Q{currentQ + 1}</span>
+              <p style={styles.activeQText}>{questions[currentQ]}</p>
+              {currentQ < questions.length - 1 && (
+                <button
+                  onClick={goToNextQuestion}
+                  style={styles.nextQBtn}
+                >
+                  <ChevronRight size={14} />
+                  Next Question
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -471,23 +618,6 @@ export default function Interview() {
               </button>
             ))}
           </div>
-
-          {/* Active question highlight */}
-          {phase === 'recording' && (
-            <div className="card" style={styles.activeQCard}>
-              <span style={styles.qBadge}>Now Answering — Q{currentQ + 1}</span>
-              <p style={styles.activeQText}>{questions[currentQ]}</p>
-              {currentQ < questions.length - 1 && (
-                <button
-                  onClick={() => setCurrentQ((q) => q + 1)}
-                  style={styles.nextQBtn}
-                >
-                  <ChevronRight size={14} />
-                  Next Question
-                </button>
-              )}
-            </div>
-          )}
 
           {/* Tips */}
           <div className="card" style={styles.tipsCard}>
