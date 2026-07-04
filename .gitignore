@@ -1,0 +1,12 @@
+.venv/
+venv/
+node_modules/
+Backend/__pycache__/
+Backend/**/__pycache__/
+Backend/recruitai.db
+Backend/app.db
+Backend/cv_module/models/fer_raf_combined_final.keras
+.env
+Backend/.env
+Backend/app/ml/saved_model/best_model.pt
+Backend/uploads/
