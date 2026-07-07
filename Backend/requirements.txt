@@ -115,3 +115,6 @@ uvicorn==0.30.6
 watchfiles==1.2.0
 websockets==16.0
 wrapt==2.2.2
+protobuf==4.25.3
+google-ai-generativelanguage==0.6.10
+google-api-core==2.24.0
