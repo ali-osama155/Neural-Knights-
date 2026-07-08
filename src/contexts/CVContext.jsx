@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 
+const BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 /**
  * CVContext - Manages CV analysis data globally
  * Stores: CV upload status, analysis results (score, skills, role), and polling state
@@ -25,7 +27,7 @@ export function CVProvider({ children }) {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('http://localhost:8000/api/v1/cv/upload', {
+      const response = await fetch(`${BACKEND}/api/v1/cv/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -63,7 +65,7 @@ export function CVProvider({ children }) {
     try {
       let attempts = 0
       while (attempts < maxAttempts) {
-        const response = await fetch('http://localhost:8000/api/v1/cv/latest', {
+        const response = await fetch(`${BACKEND}/api/v1/cv/latest`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
