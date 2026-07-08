@@ -22,8 +22,18 @@ from sklearn.metrics.pairwise import cosine_similarity
 logger = logging.getLogger(__name__)
 
 # ── Resolve model paths ──────────────────────────────────────────────────────
-_BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent  # project root
-_MODEL_DIR = _BASE_DIR / "analysis model"
+_CURRENT_DIR = Path(__file__).resolve().parent
+
+# Safely walk up the directory tree to find the "analysis model" folder
+_MODEL_DIR = None
+for p in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
+    if (p / "analysis model").exists():
+        _MODEL_DIR = p / "analysis model"
+        break
+
+# Fallback just in case the folder name changes or is missing
+if _MODEL_DIR is None:
+    _MODEL_DIR = _CURRENT_DIR.parent.parent / "analysis model"
 
 _lgbm_model = None
 _tfidf_vectorizer = None
