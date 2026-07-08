@@ -9,7 +9,6 @@ Provides:
   - Rule-based recommendations
   - Best-fit role inference from detected skills
 """
-
 import re
 import pickle
 import logging
@@ -22,18 +21,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 logger = logging.getLogger(__name__)
 
 # ── Resolve model paths ──────────────────────────────────────────────────────
+# Point directly to the folder this script is currently in
 _CURRENT_DIR = Path(__file__).resolve().parent
-
-# Safely walk up the directory tree to find the "analysis model" folder
-_MODEL_DIR = None
-for p in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (p / "analysis model").exists():
-        _MODEL_DIR = p / "analysis model"
-        break
-
-# Fallback just in case the folder name changes or is missing
-if _MODEL_DIR is None:
-    _MODEL_DIR = _CURRENT_DIR.parent.parent / "analysis model"
 
 _lgbm_model = None
 _tfidf_vectorizer = None
@@ -47,8 +36,9 @@ def _load_models():
 
     import joblib
 
-    lgbm_path = _MODEL_DIR / "lgbm_model.pkl"
-    tfidf_path = _MODEL_DIR / "tfidf_vectorizer.pkl"
+    # Look for the models in the exact same folder as cv_analyzer.py
+    lgbm_path = _CURRENT_DIR / "lgbm_model.pkl"
+    tfidf_path = _CURRENT_DIR / "tfidf_vectorizer.pkl"
 
     if not lgbm_path.exists():
         raise FileNotFoundError(f"LightGBM model not found at {lgbm_path}")
@@ -66,7 +56,6 @@ def _load_models():
         _tfidf_vectorizer = joblib.load(tfidf_path)
 
     logger.info("Models loaded successfully.")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TECH ALIASES  (from notebook cell 7)
